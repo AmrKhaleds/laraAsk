@@ -14,24 +14,28 @@ As mentioned, middleware can be defined on a route (e.g. in web.php or api.php) 
 An example in web.php:
 
 // Get all the posts, but only if the user has signed in to the website 
+```
 Route::get('/posts', [PostController::class, 'index'])->middleware('auth');
+```
 An example in PostController.php:
-
+```
 public function __construct() {
     // Apply the `auth` middleware to every function in this controller
     $this->middleware('auth');
     // Apply the `signed` middleware, but only to the functions `download` and `delete`
     $this->middleware('signed', ['only' => ['download', 'delete']]);
 }
+```
 
 Gates
 Gates are functions defined in your AuthServiceProvider.php file (in the App\Providers folder) and specify what a user is allowed to do and what they're not allowed to do. For example:
-
+```
 Gate::define('delete-post', function (User $user, Post $post) {
     return $user->id === $post->user_id;
 });
+```
 Then in your PostController's delete method:
-
+```
 public function delete(Request $request, Post $post)
 {
     if (Gate::denies('delete-post', $post)) { // Returns true if `$post->user_id` is not the same as `$user->id` (a.k.a the user is not allowed to delete this post)
@@ -40,11 +44,13 @@ public function delete(Request $request, Post $post)
 
     $post->delete();
 }
+```
 You can also use some helper methods in your blade templates:
-
+```
 @can('delete-post', $post)
     <!-- Show a link to the delete page here -->
 @endcan
+```
 (I've expanded on this below)
 
 Guards
@@ -68,16 +74,16 @@ Which guard to use is specified in auth.php. Mine currently looks like this:
 So in this case, requests coming in via the browser will have a session assigned when they log in, and requests coming in via an API call will need to get / provide a token to authenticate. Both will look up the users table to check the username / password when authenticating.
 
 You can specify which guard to use with the auth() call:
-
+```
 auth('api')->attempt(['api_key' => 'abc1234'])
-
+```
 (and side note, I got caught up with this, as I was wondering why auth()->user() wasn't returning the current user, and that's because web was the default guard, and I was trying to get the user who had authenticated via api, so be sure to be explicit about which guard!)
 
 Policies
 Policies work similarly to gates, but just apply to a specific model and are stored in their own file (in App\Policies)
 
 You can create one by using php artisan make:policy PostPolicy -m Post. It'll create a file called PostPolicy.php which will create a bunch of functions:
-
+```
 viewAny // Can the user even look at this model? If no, they'll be denied for all the below methods
 view // Can the user look at the specified Post?
 create // Can they create a new Post
@@ -86,35 +92,41 @@ delete // Can they (soft) delete the specified Post?
 restore // Can they restore the specified (soft) deleted Post?
 forceDelete // Can they force delete the specified Post?
 Typical function(s) would look like this:
-
+```
+```
 public function viewAny(User $user)
 {
     // If this returns true, then the other methods will be evaluated.
     return $user->can_view_posts;
 }
-
+```
+```
 public function forceDelete(User $user, Post $post)
 {
     // If this returns true, then the user can force delete the post.
     // This depends on viewAny being true
     return $post->user_id == $user->id;
 }
+```
 One thing to note, is that viewAny is NOT the same as "view all"! Think of viewAny as the front door to a building. If viewAny is true, you can go into the lobby, but you can't look inside any of the rooms unless view for a particular room is also true.
 
 I believe you can also use the @can in blade templates with policies:
-
+```
 @can('forceDelete', $post)
     <!-- Show button to force delete a post here -->
 @endcan
+```
 And the inverse too:
-
+```
 @cannot('view', $post)
     <!-- Show a greyed out button or something -->
 @cannot
+```
 As well as the @canany for checking multiple permissions:
-
+```
 @canany(['edit', 'delete'])
     <!-- Show something if the user can edit OR delete -->
 @endcanany
+```
 Conclusion
 I hope this has been useful. I certainly learned a lot while reading up on this. There's way more to this than I thought, so it's worth checking out the Laravel documentation because I may be right in some things, but I may be waaay off in other things.
